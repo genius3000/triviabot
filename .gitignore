@@ -1,5 +1,8 @@
 config.py
+*.pid
+*.sh
 savedata/*
 __pycache__/*
 *.pyc
 .ropeproject
+.log

@@ -48,8 +48,9 @@
 #
 
 import json
-from os import listdir, path, makedirs
-from random import choice
+from os import execl, listdir, path, makedirs
+from random import choice, randint
+import sys
 
 from twisted.words.protocols import irc
 from twisted.internet import reactor
@@ -80,6 +81,7 @@ class triviabot(irc.IRCClient):
         self._current_points = 5
         self._questions_dir = config.Q_DIR
         self._lc = LoopingCall(self._play_game)
+        self._restarting = False
         self._quit = False
         self._load_game()
         self._votes = 0
@@ -157,7 +159,6 @@ class triviabot(irc.IRCClient):
             self._start(None, None, None)
         else:
             self._gmsg('Welcome to %s!' % self._game_channel)
-            self._gmsg("Have an admin start the game when you are ready.")
             self._gmsg("For how to use this bot, just say ?help or '%s help'." % self.nickname)
 
     def joined(self, channel):
@@ -174,7 +175,7 @@ class triviabot(irc.IRCClient):
         self.notice(user, "Welcome to %s!" % self._game_channel)
         self.notice(user, "For how to use this bot, just say ?help or '%s help'." % self.nickname)
         if not self.factory.running:
-            self.notice(user, "Bug an admin to start the game when you are ready.")
+            self.notice(user, "Just say ?start to start the game when you are ready.")
 
     def privmsg(self, user, channel, msg):
         '''
@@ -255,13 +256,13 @@ class triviabot(irc.IRCClient):
         try:
             self._admins.index(user)
         except:
-            self.notice(user, "Commands: score, standings, question, clue, "
-                       "help, next, source")
+            self.notice(user, "Commands: start, stop, score, standings, "
+                       "question, clue, help, next, source")
             return
-        self.notice(user, "Commands: score, standings, question, clue, help, "
-                   "next, skip, source")
-        self.notice(user, "Admin commands: die, set <user> <score>, start, stop, "
-                   "save")
+        self.notice(user, "Commands: start, stop, score, standings, "
+                   "question, clue, help, next, skip, source")
+        self.notice(user, "Admin commands:  restart, die, "
+                   "set <user> <score>, save")
 
     def _show_source(self, args, user, channel):
         '''
@@ -270,7 +271,7 @@ class triviabot(irc.IRCClient):
         progress.
         '''
         self.notice(user, 'My source can be found at: '
-                   'https://github.com/rawsonj/triviabot')
+                   'https://github.com/genius3000/triviabot')
 
     def select_command(self, command, args, user, channel):
         '''
@@ -282,6 +283,8 @@ class triviabot(irc.IRCClient):
         # set up command dicts.
         unpriviledged_commands = {'score': self._score,
                                   'help': self._help,
+                                  'start': self._start,
+                                  'stop': self._stop,
                                   'source': self._show_source,
                                   'standings': self._standings,
                                   'question': self._show_question,
@@ -289,10 +292,9 @@ class triviabot(irc.IRCClient):
                                   'next': self._next_vote,
                                   'skip': self._next_question
                                   }
-        priviledged_commands = {'die': self._die,
+        priviledged_commands = {'restart': self._restart,
+                                'die': self._die,
                                 'set': self._set_user_score,
-                                'start': self._start,
-                                'stop': self._stop,
                                 'save': self._save_game,
                                 }
         print(command, args, user, channel)
@@ -411,6 +413,13 @@ class triviabot(irc.IRCClient):
             return
         self.notice(user, args[0]+" score set to "+args[1])
 
+    def _restart(self, *args):
+        '''
+        Restart the bot.
+        '''
+        self._restarting = True
+        self.quit('Restarting eh')
+
     def _die(self, *args):
         '''
         Terminates execution of the bot.
@@ -423,7 +432,9 @@ class triviabot(irc.IRCClient):
         Called when connection is lost
         '''
         global reactor
-        if self._quit:
+        if self._restarting:
+            execl(sys.executable, 'python -u', __file__)
+        elif self._quit:
             reactor.stop()
 
     def _score(self, args, user, channel):
@@ -527,12 +538,30 @@ class ircbotFactory(ClientFactory):
 
 
 if __name__ == "__main__":
+    try:
+        config.BIND_PORT
+    except:
+        config.BIND_PORT = randint(40000,43000)
+    try:
+        config.BIND_ADDR
+    except:
+        config.BIND_ADDR = '0.0.0.0'
+    try:
+        config.SERVER_TYPE
+    except:
+        config.SERVER_TYPE = 'plain'
+
+    BIND = (config.BIND_ADDR, config.BIND_PORT)
+
     if config.SERVER_TYPE == 'ssl':
         reactor.connectSSL(config.SERVER, config.SERVER_PORT,
                            ircbotFactory(), ssl.ClientContextFactory(),
-                           config.TIMEOUT, config.BIND)
-    else:
+                           config.TIMEOUT, BIND)
+    elif config.SERVER_TYPE == 'plain':
         reactor.connectTCP(config.SERVER, config.SERVER_PORT,
-                           ircbotFactory(), config.TIMEOUT,
-                           config.BIND)
+                           ircbotFactory(), config.TIMEOUT, BIND)
+    else:
+        print('Invalid server_type specified in config.')
+        print("Either enter 'ssl', 'plain', or leave commented out.")
+        quit()
     reactor.run()

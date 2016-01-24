@@ -25,10 +25,13 @@ class Answer:
 
     def give_clue(self):
         length = len(self._answer)
-        expose = int(length*'0.25')
-        for i in expose:
+        expose = int(length*0.25)
+        if expose == 0: expose = 1
+        #print("length: %d and expose: %d" % (length, expose))
+        for i in range(0, expose):
+            #print("i: %d" % i)
             exposed = self.unmask()
-        self._masked_answer = exposed
+            #print(exposed)
         return self._masked_answer
 
     def unmask(self):

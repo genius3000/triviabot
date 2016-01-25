@@ -472,7 +472,7 @@ class triviabot(irc.IRCClient):
         score_list = []
         if not user is None:
             self.msg(dst, "The current trivia standings are: ")
-        sorted_scores = sorted(self._scores.iteritems())
+        sorted_scores = sorted(self._scores.iteritems(), key=lambda x:x[1], reverse=True)
         for rank, (player, score) in enumerate(sorted_scores, start=1):
             formatted_score = "#%s: %s with %s points" % (rank, player, score)
             score_list.append(formatted_score)

@@ -272,6 +272,8 @@ class triviabot(irc.IRCClient):
         '''
         self.notice(user, 'My source can be found at: '
                    'https://github.com/genius3000/triviabot')
+        self.notice(user, 'Original source can be found at: '
+                   'https://github.com/rawsonj/triviabot')
 
     def select_command(self, command, args, user, channel):
         '''

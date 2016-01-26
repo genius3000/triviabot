@@ -172,10 +172,15 @@ class triviabot(irc.IRCClient):
         Callback for when other users join the channel
         '''
         if channel != self._game_channel: return
-        self.notice(user, "Welcome to %s!" % self._game_channel)
-        self.notice(user, "For how to use this bot, just say ?help or '%s help'." % self.nickname)
-        if not self.factory.running:
-            self.notice(user, "Just say ?start to start the game when you are ready.")
+        # If admin, don't send intro notice and op them
+        try:
+            self._admins.index(user)
+        except:
+            self.notice(user, "Welcome to %s!" % self._game_channel)
+            self.notice(user, "For how to use this bot, just say ?help or '%s help'." % self.nickname)
+            if not self.factory.running:
+                self.notice(user, "Just say ?start to start the game when you are ready.")
+        self.mode(channel, True, 'o', user=user)
 
     def privmsg(self, user, channel, msg):
         '''

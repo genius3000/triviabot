@@ -1,6 +1,6 @@
 ##                ##
 # TriviaBot Config #
-##                 ##
+##                ##
 
 # List of admin nicknames and the single game channel
 ADMINS = ['admin', 'Bob']

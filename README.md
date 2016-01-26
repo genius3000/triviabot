@@ -1,3 +1,18 @@
+This fork is intended to bring in some new features and clean up some questions.
+Current modifications include:
+ * Got rid of color messages
+ * Start/Stop commands are now under user privilege
+ * Re-organized the config file and added options for quit msg, real name, usermodes, 
+   local bind address, and ssl or plain connection.
+ * Answers get unmasked by 25% of their total length each time
+ * Increased the points, spruced up the clue messages
+ * Fixed the quit command and added a restart
+
+Also merged in more question fixes from [AeroSteveO](https://github.com/AeroSteveO/triviabot)
+
+
+Original README
+--------------
 triviabot
 =========
 

@@ -5,4 +5,4 @@ savedata/*
 __pycache__/*
 *.pyc
 .ropeproject
-.log
+.log*

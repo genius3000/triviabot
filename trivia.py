@@ -50,6 +50,7 @@
 import json
 from os import execl, listdir, path, makedirs
 from random import choice, randint
+import re
 import sys
 
 from twisted.words.protocols import irc
@@ -75,6 +76,7 @@ class triviabot(irc.IRCClient):
         self._answer = Answer()
         self._question = ''
         self._scores = {}
+        self._userlist = {}
         self._clue_number = 0
         self._admins = list(config.ADMINS)
         self._game_channel = config.GAME_CHANNEL
@@ -147,14 +149,48 @@ class triviabot(irc.IRCClient):
             self._clue_number = 0
             self._get_new_question()
 
+    def irc_RPL_NAMREPLY(self, *nargs):
+        '''
+        Called when we get a reply to NAMES
+        Using this for tracking user modes, in a simplistic manner
+        '''
+        if (nargs[1][2] != self._game_channel): return
+        users = nargs[1][3].split()
+        for u in users:
+            split = re.split('(\~|\&|\@|\%|\+)', u)
+            try:
+                mode = split[1]
+                user = split[2]
+            except IndexError:
+                mode = ''
+                user = split[0]
+            mode = mode.replace('+', 'voice')
+            mode = mode.replace('%', 'halfop')
+            mode = mode.replace('@', 'op')
+            mode = mode.replace('&', 'admin')
+            mode = mode.replace('~', 'owner')
+            # This is for us joining the channel and re-checking after mode changes
+            try:
+                self._userlist[user]
+                self._userlist['modes'] = (mode,)
+            except:
+                self._userlist[user] = {}
+                self._userlist[user]['wins'] = 0
+                self._userlist[user]['modes'] = (mode,)
+                self._userlist[user]['strikes'] = 0
+
     def signedOn(self):
         '''
         Actions to perform on signon to the server.
         '''
-        self.join(self._game_channel)
-        self.msg('NickServ', 'identify %s' % config.IDENT_PASS)
+        try:
+            config.IDENT_PASS
+            self.msg('NickServ', 'identify %s' % config.IDENT_PASS)
+        except:
+            pass
         self.mode(self.nickname, True, config.DEFAULT_MODES)
         print("Signed on as %s." % (self.nickname,))
+        self.join(self._game_channel)
         if self.factory.running:
             self._start(None, None, None)
         else:
@@ -164,23 +200,79 @@ class triviabot(irc.IRCClient):
     def joined(self, channel):
         '''
         Callback runs when the bot joins a channel
+        A join automatically receives a NAMES reply, for user listing
         '''
         print("Joined %s." % (channel,))
+        if (channel != self._game_channel):
+            self.leave(channel, 'No!')
+            return
 
     def userJoined(self, user, channel):
         '''
         Callback for when other users join the channel
         '''
         if channel != self._game_channel: return
+        # Add user to userlist, track wins, modes, and strikes of user
+        self._userlist[user] = {}
+        self._userlist[user]['wins'] = 0
+        self._userlist[user]['modes'] = ('',)
+        self._userlist[user]['strikes'] = 0
         # If admin, don't send intro notice and op them
         try:
             self._admins.index(user)
             self.mode(channel, True, 'o', user=user)
+            self._userlist[user]['modes'].append('op')
         except:
             self.notice(user, "Welcome to %s!" % self._game_channel)
             self.notice(user, "For how to use this bot, just say ?help or '%s help'." % self.nickname)
             if not self.factory.running:
                 self.notice(user, "Just say ?start to start the game when you are ready.")
+
+    def userLeft(self, user, channel):
+        '''
+        Called when a user leaves the game channel
+        '''
+        if channel != self._game_channel: return
+        if user in self._userlist:
+            del self._userlist[user]
+
+    def userQuit(self, user, quitMessage):
+        '''
+        Called when a user quits
+        '''
+        if channel != self._game_channel: return
+        if user in self._userlist:
+            del self._userlist[user]
+
+    def userKicked(self, kickee, channel, kicker, message):
+        '''
+        Called when a user is kicked from the game channel
+        '''
+        if channel != self._game_channel: return
+        if kickee in self._userlist:
+            del self._userlist[kickee]
+
+    def userRenamed(self, oldname, newname):
+        '''
+        Called when a user changes nicknames
+        '''
+        if oldname in self._userlist:
+            self._userlist[newname] = self._userlist.pop(oldname)
+
+    def modeChanged(self, user, channel, set, modes, args):
+        '''
+        Called when a mode change is seen
+        '''
+        if channel != self._game_channel: return
+        #print('MODE: %s : direction %d : %s and %s' % (user, set, modes, args))
+        # Check if 'our' users are part of a mode change, re-run NAMES
+        user_change = False
+        for u in self._userlist:
+            if (u in args):
+                user_change = True
+                break
+        if (user_change == False): return
+        self.sendLine('NAMES %s' % channel)
 
     def privmsg(self, user, channel, msg):
         '''
@@ -232,6 +324,15 @@ class triviabot(irc.IRCClient):
             self._scores[user] = self._current_points
         self._gmsg("%s points have been added to your score!" %
                    str(self._current_points))
+        self._userlist[user]['wins'] += 1
+        if (self._userlist[user]['wins'] == 5):
+            self.mode(channel, True, 'v', user=user)
+            self._gmsg('Five correct answers! That earns you a voice!')
+            self._userlist[user]['modes'].append('voice')
+        elif (self._userlist[user]['wins'] == 20):
+            self.mode(channel, True, 'h', user=user)
+            self.gmsg('Another fifteen correct answers, have some halfops!')
+            self._userlist[user]['modes'].append('halfop')
         self._clue_number = 0
         self._get_new_question()
 
@@ -265,8 +366,8 @@ class triviabot(irc.IRCClient):
                        "question, clue, help, next, source")
             return
         self.notice(user, "Commands: start, stop, score, standings, "
-                   "question, clue, help, next, skip, source")
-        self.notice(user, "Admin commands:  restart, die, "
+                   "question, clue, help, next, source")
+        self.notice(user, "Admin commands: skip, restart, die, "
                    "set <user> <score>, save")
 
     def _show_source(self, args, user, channel):
@@ -297,9 +398,9 @@ class triviabot(irc.IRCClient):
                                   'question': self._show_question,
                                   'clue': self._give_clue,
                                   'next': self._next_vote,
-                                  'skip': self._next_question
                                   }
-        priviledged_commands = {'restart': self._restart,
+        priviledged_commands = {'skip': self._next_question,
+                                'restart': self._restart,
                                 'die': self._die,
                                 'set': self._set_user_score,
                                 'save': self._save_game,
@@ -315,6 +416,15 @@ class triviabot(irc.IRCClient):
         # priviledges.
         if not is_admin and command in priviledged_commands.keys():
             self.msg(channel, "%s: You don't tell me what to do." % user)
+            self._userlist[user]['strikes'] += 1
+            if (self._userlist[user]['strikes'] == 5):
+                self.kick(channel, user, "You've earned five strikes, be gone!")
+            elif ('halfop' in self._userlist[user]['modes']):
+                self.mode(channel, False, 'h', user=user)
+                self._userlist[user]['modes'].remove('halfop')
+            elif ('voice' in self._userlist[user]['modes']):
+                self.mode(channel, False, 'v', user=user)
+                self._userlist[user]['modes'].remove('voice')
             return
         elif is_admin and command in priviledged_commands.keys():
             priviledged_commands[command](args, user, channel)

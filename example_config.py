@@ -15,7 +15,8 @@ DEFAULT_NICK = 'TriviaBot'
 DEFAULT_NAME = 'Trivia Bot'
 DEFAULT_MODES = 'iB'
 DEFAULT_QUIT = 'This is triviabot, signing off.'
-IDENT_PASS = 'password'
+# Uncomment and change password, if the NICK is registered
+#IDENT_PASS = 'password'
 
 # Trivia Speed
 WAIT_INTERVAL = 15

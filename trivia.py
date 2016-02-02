@@ -148,12 +148,13 @@ class triviabot(irc.IRCClient):
             self._gmsg('No one got it. The answer was: %s' %
                        self._answer.answer)
             self._clue_number = 0
-            self._get_new_question()
             self._no_plays += 1
             # Stop gameplay after 10 questions of no activity
             if (self._no_plays == 10):
                 self._gmsg('It appears I am talking to myself now!')
-                self._stop
+                self._stop()
+            else:
+                self._get_new_question()
 
     def irc_RPL_NAMREPLY(self, *nargs):
         '''
@@ -560,7 +561,7 @@ class triviabot(irc.IRCClient):
         global reactor
         if self._restarting:
             # This is failing on no such file
-            execl(sys.executable, 'python -u', __file__)
+            execl(sys.executable, *([sys.executable]+sys.argv))
         elif self._quit:
             reactor.stop()
 
@@ -616,12 +617,10 @@ class triviabot(irc.IRCClient):
         if not self._lc.running:
             self._gmsg("We are not playing right now.")
             return
-        self._current_points = self._points[self._clue_number]
-        self._gmsg("%s %s  Points: %d" % (self._cluelabels[self._clue_number],
-                   self._answer.give_clue(), self._current_points))
-        self._clue_number += 1
-        # Need to reset timer!
-        #self._lc._reschedule()
+        # Just stop and start gameplay timer. It will give a new clue
+        # and wait another 'WAIT_INTERVAL' until the next clue
+        self._lc.stop()
+        self._lc.start(config.WAIT_INTERVAL)
 
     def _get_new_question(self):
         '''

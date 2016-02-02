@@ -88,6 +88,7 @@ class triviabot(irc.IRCClient):
         self._load_game()
         self._votes = 0
         self._voters = []
+        self._no_plays = 0
 
     def _get_nickname(self):
         return self.factory.nickname
@@ -148,6 +149,11 @@ class triviabot(irc.IRCClient):
                        self._answer.answer)
             self._clue_number = 0
             self._get_new_question()
+            self._no_plays += 1
+            # Stop gameplay after 10 questions of no activity
+            if (self._no_plays == 10):
+                self._gmsg('It appears I am talking to myself now!')
+                self._stop
 
     def irc_RPL_NAMREPLY(self, *nargs):
         '''
@@ -307,6 +313,8 @@ class triviabot(irc.IRCClient):
                     self._save_game()
         except:
             return
+        # Assuming this is gameplay
+        self._no_plays = 0
 
     def _winner(self, user, channel):
         '''
@@ -331,7 +339,7 @@ class triviabot(irc.IRCClient):
             self._userlist[user]['modes'].append('voice')
         elif (self._userlist[user]['wins'] == 20):
             self.mode(channel, True, 'h', user=user)
-            self.gmsg('Another fifteen correct answers, have some halfops!')
+            self._gmsg('Another fifteen correct answers, have some halfops!')
             self._userlist[user]['modes'].append('halfop')
         self._clue_number = 0
         self._get_new_question()
@@ -342,12 +350,13 @@ class triviabot(irc.IRCClient):
         '''
         msg = str(msg[0][0]).lower()
         user = (user.split("!"))[0]
+        if (msg == 'action'): return
         print("CTCP from %s : %s" % (user, msg))
-        if msg == 'version':
+        if (msg == 'version'):
             self.notice(user, "CTCP VERSION: Trivia Bot!")
-        elif msg == 'time':
+        elif (msg == 'time'):
             self.notice(user, "CTCP TIME: Trivia Time!")
-        elif msg == 'ping':
+        elif (msg == 'ping'):
             self.notice(user, "CTCP PING: Trivia Pong!")
         else:
             self.notice(user, "Unknown CTCP Query!")
@@ -550,6 +559,7 @@ class triviabot(irc.IRCClient):
         '''
         global reactor
         if self._restarting:
+            # This is failing on no such file
             execl(sys.executable, 'python -u', __file__)
         elif self._quit:
             reactor.stop()

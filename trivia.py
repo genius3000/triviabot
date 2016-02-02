@@ -560,7 +560,6 @@ class triviabot(irc.IRCClient):
         '''
         global reactor
         if self._restarting:
-            # This is failing on no such file
             execl(sys.executable, *([sys.executable]+sys.argv))
         elif self._quit:
             reactor.stop()

@@ -8,7 +8,7 @@ Current modifications include:
  * Increased the points, spruced up the clue messages
  * Fixed the quit command and added a restart
 
-Also merged in more question fixes from [AeroSteveO](https://github.com/AeroSteveO/triviabot-1)
+Also merged in more question fixes from [AeroSteveO](https://github.com/AeroSteveO/triviabot-1) and [mongolsamurai](https://github.com/mongolsamurai/triviabot)
 
 
 Original README

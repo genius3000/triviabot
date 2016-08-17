@@ -214,6 +214,16 @@ class triviabot(irc.IRCClient):
             self.leave(channel, 'No!')
             return
 
+    def kickedFrom(self, channel, kicker, message):
+        '''
+        If we get kicked from gthe game channel,
+        attempt to rejoin.
+        '''
+        print("Kicked from %s by %s: %s" % (channel, kicker, message))
+        if (channel != self._game_channel):
+            return
+        self.join(self._game_channel)
+
     def userJoined(self, user, channel):
         '''
         Callback for when other users join the channel
@@ -288,6 +298,9 @@ class triviabot(irc.IRCClient):
         '''
         user, temp = user.split('!')
         #print(user+" : "+channel+" : "+msg)
+        # ignore STATUSMSGs, lazy check
+        if (not channel[0] == "#"):
+            return
         # need to strip off colors if present.
         try:
             while not msg[0].isalnum() and not msg[0] == '?':
@@ -310,6 +323,7 @@ class triviabot(irc.IRCClient):
             # if not, try to match the message to the answer.
             else:
                 if msg.lower().strip() == self._answer.answer.lower():
+                    self._no_plays = 0
                     self._winner(user, channel)
                     self._save_game()
         except:
@@ -333,17 +347,17 @@ class triviabot(irc.IRCClient):
             self._scores[user] = self._current_points
         self._gmsg("%s points have been added to your score!" %
                    str(self._current_points))
+        self._clue_number = 0
+        self._get_new_question()
         self._userlist[user]['wins'] += 1
-        if (self._userlist[user]['wins'] == 5):
+        if (self._userlist[user]['wins'] == 2):
             self.mode(channel, True, 'v', user=user)
             self._gmsg('Five correct answers! That earns you a voice!')
             self._userlist[user]['modes'].append('voice')
-        elif (self._userlist[user]['wins'] == 20):
+        elif (self._userlist[user]['wins'] == 4):
             self.mode(channel, True, 'h', user=user)
             self._gmsg('Another fifteen correct answers, have some halfops!')
             self._userlist[user]['modes'].append('halfop')
-        self._clue_number = 0
-        self._get_new_question()
 
     def ctcpQuery(self, user, channel, msg):
         '''
@@ -480,6 +494,7 @@ class triviabot(irc.IRCClient):
         else:
             self._get_new_question()
             self._clue_number = 0
+            self._no_plays = 0
             self._lc.start(config.WAIT_INTERVAL)
             self.factory.running = True
 
@@ -598,13 +613,13 @@ class triviabot(irc.IRCClient):
             dst = channel
         score_list = []
         if not user is None:
-            self.msg(dst, "The current trivia standings are: ")
+            self.notice(dst, "The current trivia standings are: ")
         sorted_scores = sorted(self._scores.iteritems(), key=lambda x:x[1], reverse=True)
         for rank, (player, score) in enumerate(sorted_scores, start=1):
             formatted_score = "#%s: %s with %s points" % (rank, player, score)
             score_list.append(formatted_score)
         # Will have to split this at a certain length later
-        self.msg(dst, ", ".join([str(player) for player in score_list]))
+        self.notice(dst, ", ".join([str(player) for player in score_list]))
 
     def _show_question(self, args, user, channel):
         if not self._lc.running:

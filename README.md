@@ -10,6 +10,12 @@ Current modifications include:
 
 Also merged in more question fixes from [AeroSteveO](https://github.com/AeroSteveO/triviabot-1) and [mongolsamurai](https://github.com/mongolsamurai/triviabot)
 
+### Archived
+As of March 15th, 2020 I've decided to archive my fork of this project. I don't currently use the bot anymore (or any
+triviabot for that matter). My fixes for the quit and restart commands were PR'ed and accepted upstream. More activity
+has been seen upstream than here for a while, I recommend using that and cherry-picking any commits you may prefer from
+this repo.
+
 
 Original README
 --------------
